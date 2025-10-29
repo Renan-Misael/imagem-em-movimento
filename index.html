@@ -3,93 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passeio no Parque!</title>
+    <title>Corrida no Parque!</title>
     
     <style>
-        /* Remove margens e garante que o gradiente ocupe a tela toda */
+        /* --- Configuração da Tela --- */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden; /* Evita barras de rolagem */
+            font-family: Arial, sans-serif;
         }
 
         body {
-            /* 🎨 O CSS "Atraente":
-               Um gradiente que simula um parque: 
-               começa com azul-céu (#87CEEB) e termina com verde-grama (#90EE90).
-            */
+            /* Fundo de céu e grama */
             background: linear-gradient(to bottom, #87CEEB 0%, #90EE90 100%);
         }
 
-        #imagemMovel {
-            /* 🐶 O Estilo "Cachorro":
-               Vamos usar 120px para ver melhor o cachorro.
-            */
-            width: 120px;
-            height: 120px;
-
-            /* Permite o controle de 'top' e 'left' pelo JavaScript */
-            position: absolute; 
-            
-            /* Deixa a imagem perfeitamente redonda */
-            border-radius: 50%; 
-            
-            /* Garante que a foto do cachorro preencha o círculo */
-            object-fit: cover; 
-            
-            /* Adiciona uma borda branca para destacar */
-            border: 4px solid white; 
-            
-            /* Adiciona uma sombra suave para dar profundidade */
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        /* --- O Placar --- */
+        #placar {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            font-size: 1.5em;
+            font-weight: bold;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
+
+        /* --- Os Cachorrinhos --- */
+        .doggo {
+            width: 100px; /* Tamanho reduzido para caberem 2 */
+            height: 100px;
+            position: absolute; 
+            border-radius: 50%; 
+            object-fit: cover; 
+            border: 4px solid white; 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            /* Transição suave para quando o power-up acabar */
+            transition: filter 0.5s ease;
+        }
+
+        /* --- O Power-Up (Biscoito!) --- */
+        #powerup {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+            background-color: #f0e68c; /* Cor de biscoito */
+            border: 3px solid #d2b48c;
+            border-radius: 10px;
+            z-index: 5;
+            text-align: center;
+            line-height: 50px;
+            font-size: 2em;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            /* Escondido por padrão até o JS o posicionar */
+            display: none; 
+        }
+
     </style>
 </head>
 <body>
 
-    <img id="imagemMovel" src="cachorro-vieler.png" alt="Cachorrinho se movendo">
+    <div id="placar">Placar: 🐶1 (0) - 🐶2 (0)</div>
+
+    <img class="doggo" id="doggo1" src="https://placedog.net/100/100?random=1" alt="Cachorrinho 1">
+    <img class="doggo" id="doggo2" src="https://placedog.net/100/100?random=2" alt="Cachorrinho 2">
+
+    <div id="powerup">🦴</div>
+
 
     <script>
-        // 1. Seleciona a imagem
-        const img = document.getElementById('imagemMovel');
+        // --- 1. Seleção dos Elementos ---
+        const placarEl = document.getElementById('placar');
+        const powerupEl = document.getElementById('powerup');
 
-        // 2. Define a posição inicial e a velocidade
-        let x = 50; 
-        let y = 50; 
+        // --- 2. Estado dos "Jogadores" (Cachorrinhos) ---
+        // Usar objetos é a melhor forma de gerenciar múltiplos elementos
+        let dog1 = {
+            el: document.getElementById('doggo1'),
+            x: 50,
+            y: 50,
+            dx: 2,
+            dy: 3,
+            baseSpeed: { dx: 2, dy: 3 }, // Guardamos a velocidade original
+            score: 0,
+            temPowerUp: false
+        };
 
-        // Vamos usar velocidades diferentes para um movimento diagonal mais interessante
-        let dx = 2; // Velocidade horizontal
-        let dy = 3; // Velocidade vertical
+        let dog2 = {
+            el: document.getElementById('doggo2'),
+            x: 150,
+            y: 100,
+            dx: -3,
+            dy: 2,
+            baseSpeed: { dx: -3, dy: 2 },
+            score: 0,
+            temPowerUp: false
+        };
 
-        // 3. A função de loop de animação
-        function animar() {
+        // --- 3. Funções Auxiliares ---
+
+        /** Atualiza o placar na tela */
+        function atualizarPlacar() {
+            placarEl.textContent = `Placar: 🐶1 (${dog1.score}) - 🐶2 (${dog2.score})`;
+        }
+
+        /** Move o power-up para uma posição aleatória */
+        function moverPowerup() {
+            // Posição aleatória, garantindo que não saia da tela
+            const newX = Math.random() * (window.innerWidth - powerupEl.clientWidth);
+            const newY = Math.random() * (window.innerHeight - powerupEl.clientHeight);
+
+            powerupEl.style.left = newX + 'px';
+            powerupEl.style.top = newY + 'px';
+            powerupEl.style.display = 'block'; // Mostra o power-up
+        }
+
+        /** Verifica colisão entre um cachorro e um item (o power-up) */
+        function checarColisao(dog, itemEl) {
+            // Pega a posição atual do item
+            let itemX = parseFloat(itemEl.style.left);
+            let itemY = parseFloat(itemEl.style.top);
+
+            // Lógica de colisão de "caixa" (AABB - Axis-Aligned Bounding Box)
+            return (
+                dog.x < itemX + itemEl.clientWidth &&
+                dog.x + dog.el.clientWidth > itemX &&
+                dog.y < itemY + itemEl.clientHeight &&
+                dog.y + dog.el.clientHeight > itemY
+            );
+        }
+
+        /** Aplica o efeito de power-up no cachorro */
+        function aplicarPowerUp(dog) {
+            if (dog.temPowerUp) return; // Se já tiver, não faz nada
+
+            dog.temPowerUp = true;
+            
+            // Dobra a velocidade
+            dog.dx *= 2; 
+            dog.dy *= 2;
+
+            // Efeito visual (brilho)
+            dog.el.style.filter = 'drop-shadow(0 0 15px yellow) saturate(2)';
+
+            // Esconde o power-up e agenda para ele voltar
+            powerupEl.style.display = 'none';
+            setTimeout(moverPowerup, 3000); // Biscoito volta em 3 segundos
+
+            // Remove o power-up do cachorro após 2.5 segundos
+            setTimeout(() => {
+                dog.temPowerUp = false;
+                dog.el.style.filter = ''; // Remove o brilho
+                
+                // Retorna à velocidade base (mantendo a direção atual)
+                dog.dx = Math.sign(dog.dx) * Math.abs(dog.baseSpeed.dx);
+                dog.dy = Math.sign(dog.dy) * Math.abs(dog.baseSpeed.dy);
+            }, 2500); // Duração do power-up
+        }
+
+
+        /** Função que atualiza a posição de UM cachorro */
+        function updateDog(dog) {
             // Atualiza as posições
-            x += dx;
-            y += dy;
+            dog.x += dog.dx;
+            dog.y += dog.dy;
 
             // Aplica as novas posições no estilo da imagem
-            img.style.left = x + 'px';
-            img.style.top = y + 'px';
+            dog.el.style.left = dog.x + 'px';
+            dog.el.style.top = dog.y + 'px';
 
-            // 4. Verificação de Colisão com as Bordas
+            // --- Verificação de Colisão com as Bordas ---
             
+            let colidiu = false;
+
             // Borda direita (largura da janela) OU borda esquerda (0)
-            if (x + img.clientWidth >= window.innerWidth || x <= 0) {
-                dx = -dx; // Inverte a direção horizontal
+            if (dog.x + dog.el.clientWidth >= window.innerWidth || dog.x <= 0) {
+                dog.dx = -dog.dx; // Inverte a direção horizontal
+                colidiu = true;
             }
 
             // Borda inferior (altura da janela) OU borda superior (0)
-            if (y + img.clientHeight >= window.innerHeight || y <= 0) {
-                dy = -dy; // Inverte a direção vertical
+            if (dog.y + dog.el.clientHeight >= window.innerHeight || dog.y <= 0) {
+                dog.dy = -dog.dy; // Inverte a direção vertical
+                colidiu = true;
             }
 
-            // 5. Pede ao navegador para otimizar e chamar 'animar' novamente
+            // Atualiza o placar se houve colisão
+            if (colidiu) {
+                dog.score++;
+                atualizarPlacar();
+            }
+        }
+
+
+        // --- 4. O Loop Principal de Animação ---
+        function animar() {
+            // Atualiza o estado de cada cachorro
+            updateDog(dog1);
+            updateDog(dog2);
+
+            // Verifica se algum cachorro pegou o power-up
+            if (powerupEl.style.display === 'block') {
+                if (checarColisao(dog1, powerupEl)) {
+                    aplicarPowerUp(dog1);
+                } else if (checarColisao(dog2, powerupEl)) {
+                    aplicarPowerUp(dog2);
+                }
+            }
+            
+            // Continua o loop
             requestAnimationFrame(animar);
         }
 
-        // Inicia o loop de animação
-        animar();
+        // --- 5. Início ---
+        atualizarPlacar(); // Define o placar inicial (0-0)
+        moverPowerup(); // Coloca o primeiro biscoito na tela
+        animar(); // Inicia o loop de animação
     </script>
 </body>
 </html>
