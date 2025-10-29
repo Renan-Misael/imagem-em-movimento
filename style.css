@@ -1,0 +1,20 @@
+body {
+    /* Garante que a tela inteira seja usada */
+    margin: 0;
+    padding: 0;
+    /* Evita barras de rolagem desnecessárias */
+    overflow: hidden; 
+}
+
+#imagemMovel {
+    /* Esta é a mágica do CSS! */
+    position: absolute; 
+    
+    /* Posição inicial */
+    top: 50px;
+    left: 50px;
+
+    /* Tamanho de exemplo */
+    width: 100px;
+    height: 100px;
+}
